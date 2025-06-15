@@ -90,6 +90,13 @@ const chatIO = new Server(chatServer, {
 chatIO.on('connection', (socket) => {
     console.log(`Usuario conectado al chat: ${socket.id}`);
 
+      // Espera a que el cliente envíe su nombre
+    socket.on('set_username', (username: string) => {
+        socket.data.username = username; // Guarda el nombre en el socket
+
+        // Notifica a todos los usuarios que un nuevo usuario se ha conectado
+        chatIO.emit('user_connected', { message: `Nuevo usuario conectado: ${username}` });
+    });
     // Verificación JWT para el socket principal
     socket.use(([event, ...args], next) => {
         const token = socket.handshake.auth.token;
@@ -112,10 +119,13 @@ chatIO.on('connection', (socket) => {
     });
 
     // Manejar evento para unirse a una sala
-    socket.on('join_room', (roomId: string) => {
-        socket.join(roomId);
-        console.log(`Usuario con ID: ${socket.id} se unió a la sala: ${roomId}`);
-    });
+    socket.on('join_room', (data: { roomId: string, username: string }) => {
+        socket.join(data.roomId);
+        socket.data.username = data.username; // Guarda el nombre en el socket
+        console.log(`Usuario ${data.username} (${socket.id}) se unió a la sala: ${data.roomId}`);
+        // Emitir a todos los usuarios en la sala que un nuevo usuario se ha unido
+        socket.to(data.roomId).emit('user_joined_room', { message: `${data.username} se ha unido a la sala` });
+});
 
     // Manejar evento para enviar un mensaje
     socket.on('send_message', (data: ChatMessage) => {
